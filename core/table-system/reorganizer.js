@@ -3,9 +3,15 @@ import { saveChat } from "/script.js";
 import { renderTables } from '../../ui/table-bindings.js';
 import { extensionName } from "../../utils/settings.js";
 import { convertTablesToCsvString, saveStateToMessage, getMemoryState, updateTableFromText, getBatchFillerRuleTemplate, getBatchFillerFlowTemplate } from './manager.js';
-import { getPresetPrompts, getMixedOrder } from '../../PresetSettings/index.js';
 import { callAI, generateRandomSeed } from '../api.js';
 import { callNccsAI } from '../api/NccsApi.js';
+import { getPresetToolkit } from '../utils/optional-modules.js';
+
+const DEFAULT_REORGANIZER_ORDER = [
+    { type: 'conditional', id: 'flowTemplate' },
+];
+const FALLBACK_REORGANIZER_PROMPT =
+    '你是 Amily2 的表格整理助手，请根据当前表格内容输出规范的 <Amily2Edit> 操作，保持数据一致性并避免多余文本。';
 
 export async function reorganizeTableContent() {
     const settings = extension_settings[extensionName];
@@ -30,8 +36,15 @@ export async function reorganizeTableContent() {
             return;
         }
 
-        const order = getMixedOrder('reorganizer') || [];
-        const presetPrompts = await getPresetPrompts('reorganizer');
+        const presetToolkit = await getPresetToolkit();
+        if (!presetToolkit?.available) {
+            console.warn("[表格重整] 预设提示模块未加载，使用默认回退顺序。");
+        }
+        let order = presetToolkit?.getMixedOrder ? presetToolkit.getMixedOrder('reorganizer') || [] : [];
+        if (!order.length) {
+            order = DEFAULT_REORGANIZER_ORDER;
+        }
+        const presetPrompts = presetToolkit?.getPresetPrompts ? await presetToolkit.getPresetPrompts('reorganizer') : [];
         
         const messages = [
             { role: 'system', content: generateRandomSeed() }
@@ -55,6 +68,10 @@ export async function reorganizeTableContent() {
                         break;
                 }
             }
+        }
+
+        if (!presetPrompts.length) {
+            messages.push({ role: 'system', content: FALLBACK_REORGANIZER_PROMPT });
         }
 
         console.groupCollapsed(`[Amily2 重新整理] 即将发送至 API 的内容`);

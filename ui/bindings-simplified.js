@@ -11,7 +11,7 @@ import { showContentModal, showHtmlModal } from './page-window.js';
 
 // {{CODE-Cycle-Integration:
 //   Task_ID: [T301]
-//   Timestamp: [2025-11-18T04:27:53.561Z]
+//   Timestamp: [2025-11-18T04:27:04.761Z]
 //   Phase: [D-Develop]
 //   Context-Analysis: "精简版ui/bindings.js，移除已裁剪功能，保留核心授权、API和基础UI功能"
 //   Principle_Applied: "Aether-Engineering-SOLID-S, KISS-Principle"

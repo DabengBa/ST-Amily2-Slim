@@ -61,15 +61,28 @@ async function handleTableUpdate(messageId) {
 
 
 
-import { processOptimization } from "./summarizer.js";
-import { executeAutoHide } from './autoHideManager.js';
 import { checkAndTriggerAutoSummary } from './historiographer.js';
 import { fillWithSecondaryApi } from './table-system/secondary-filler.js';
+import { getAutoHideManager } from './utils/optional-modules.js';
+
+async function triggerAutoHideIfNeeded(settings) {
+    const shouldRun = settings.autoHideEnabled || settings.autoHideSummarizedEnabled;
+    if (!shouldRun) {
+        return;
+    }
+    try {
+        const autoHideModule = await getAutoHideManager();
+        if (autoHideModule?.executeAutoHide) {
+            await autoHideModule.executeAutoHide();
+        } else {
+            log('[自动隐藏] 功能已启用，但模块不可用，已跳过本次隐藏。', 'warn');
+        }
+    } catch (error) {
+        console.error('[自动隐藏] 执行时发生错误，已跳过本轮:', error);
+    }
+}
 
 export async function onMessageReceived(data) {
-    window.lastPreOptimizationResult = null;
-    document.dispatchEvent(new CustomEvent('preOptimizationTextUpdated')); 
-
     const context = getContext();
     if ((data && data.is_user) || context.isWaitingForUserInput) { return; }
 
@@ -82,31 +95,7 @@ export async function onMessageReceived(data) {
 
     const tableSystemEnabled = settings.table_system_enabled !== false; 
     
-    await executeAutoHide();
-    const isOptimizationEnabled = settings.optimizationEnabled && settings.apiUrl;
-    if (isOptimizationEnabled) {
-        if (chat.length >= 2 && chat[chat.length - 2].is_user) {
-            const contextCount = settings.contextMessages || 2;
-            const startIndex = Math.max(0, chat.length - 1 - contextCount);
-            const previousMessages = chat.slice(startIndex, chat.length - 1);
-
-            const result = await processOptimization(latestMessage, previousMessages);
-            if (result) {
-                window.lastPreOptimizationResult = result;
-                document.dispatchEvent(new CustomEvent('preOptimizationTextUpdated'));
-            }
-
-            if (result && result.optimizedContent && result.optimizedContent !== latestMessage.mes) {
-                latestMessage.mes = result.optimizedContent;
-                await saveChatConditional();
-                if (settings.optimizationMode === 'refresh') {
-                    await reloadCurrentChat();
-                }
-            }
-        } else {
-            console.log("[Amily2号-正文优化] 检测到消息并非AI对用户的直接回复，已跳过优化。");
-        }
-    }
+    await triggerAutoHideIfNeeded(settings);
     if (tableSystemEnabled) {
         const fillingMode = settings.filling_mode || 'main-api';
         if (fillingMode === 'secondary-api') {

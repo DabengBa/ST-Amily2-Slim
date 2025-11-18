@@ -43,9 +43,6 @@ export function generateTableContent() {
             }
         }
 
-        if (injectionContent.trim() && window.MiZheSi_Global?.isEnabled()) {
-            injectionContent = `%%AMILY2_TABLE_INJECTION%%${injectionContent}`;
-        }
     } catch (error) {
         console.error('[Amily2-表格内容生成器] 生成表格内容时发生错误:', error);
         return ''; 

@@ -5,11 +5,14 @@ import { renderTables } from '../../ui/table-bindings.js';
 import { updateOrInsertTableInChat } from '../../ui/message-table-renderer.js';
 import { extensionName } from "../../utils/settings.js";
 import { updateTableFromText, getBatchFillerRuleTemplate, getBatchFillerFlowTemplate, convertTablesToCsvString, saveStateToMessage, getMemoryState, clearHighlights } from './manager.js';
-import { getPresetPrompts, getMixedOrder } from '../../PresetSettings/index.js';
 import { callAI, generateRandomSeed } from '../api.js';
 import { callNccsAI } from '../api/NccsApi.js';
 import { extractBlocksByTags, applyExclusionRules } from '../utils/rag-tag-extractor.js';
 import { safeLorebookEntries } from '../tavernhelper-compatibility.js';
+import { getPresetToolkit } from '../utils/optional-modules.js';
+
+const FALLBACK_SECONDARY_PROMPT =
+    '你是 Amily2 的分步填表助手，请参考规则模板与最新消息，仅在 <Amily2Edit> 中输出插入/更新/删除操作，禁止额外文本。';
 
 
 async function getWorldBookContext() {
@@ -139,21 +142,23 @@ export async function fillWithSecondaryApi(latestMessage, forceRun = false) {
         const currentInteractionContent = (lastUserMessage ? `${userName}（用户）最新消息：${lastUserMessage.mes}\n` : '') + 
                                           `${characterName}（AI）最新消息，[核心处理内容]：${textToProcess}`;
 
-        let mixedOrder;
-        try {
-            const savedOrder = localStorage.getItem('amily2_prompt_presets_v2_mixed_order');
-            if (savedOrder) {
-                mixedOrder = JSON.parse(savedOrder);
-            }
-        } catch (e) {
-            console.error("[副API填表] 加载混合顺序失败:", e);
+        const presetToolkit = await getPresetToolkit();
+        if (!presetToolkit?.available) {
+            console.warn("[副API填表] 预设提示模块未加载，使用默认回退顺序。");
+        }
+        let order = presetToolkit?.getMixedOrder ? presetToolkit.getMixedOrder('secondary_filler') || [] : [];
+        if (!order.length) {
+            order = [
+                { type: 'conditional', id: 'worldbook' },
+                { type: 'conditional', id: 'contextHistory' },
+                { type: 'conditional', id: 'ruleTemplate' },
+                { type: 'conditional', id: 'flowTemplate' },
+                { type: 'conditional', id: 'coreContent' },
+            ];
         }
 
 
-        const order = getMixedOrder('secondary_filler') || [];
-
-
-        const presetPrompts = await getPresetPrompts('secondary_filler');
+        const presetPrompts = presetToolkit?.getPresetPrompts ? await presetToolkit.getPresetPrompts('secondary_filler') : [];
         
         const messages = [
             { role: 'system', content: generateRandomSeed() }
@@ -203,6 +208,10 @@ export async function fillWithSecondaryApi(latestMessage, forceRun = false) {
                         break;
                 }
             }
+        }
+
+        if (!presetPrompts.length) {
+            messages.push({ role: 'system', content: FALLBACK_SECONDARY_PROMPT });
         }
 
         const fillingMode = settings.filling_mode || 'main-api';

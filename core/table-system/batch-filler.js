@@ -5,10 +5,10 @@ import { log } from './logger.js';
 import { updateTableFromText } from './manager.js';
 import { extensionName } from '../../utils/settings.js';
 import { renderTables } from '../../ui/table-bindings.js';
-import { getPresetPrompts, getMixedOrder } from '../../PresetSettings/index.js';
 import { callAI, generateRandomSeed } from '../api.js';
 import { callNccsAI } from '../api/NccsApi.js';
 import { extractBlocksByTags, applyExclusionRules } from '../utils/rag-tag-extractor.js';
+import { getPresetToolkit } from '../utils/optional-modules.js';
 
 import { getBatchFillerRuleTemplate, getBatchFillerFlowTemplate, convertTablesToCsvString } from './manager.js';
 
@@ -19,6 +19,29 @@ let totalBatches = 0;
 let chatHistoryLength = 0;
 let threshold = 30;
 const MAX_RETRIES = 2; 
+
+const DEFAULT_BATCH_MIXED_ORDER = [
+    { type: 'conditional', id: 'worldbook' },
+    { type: 'conditional', id: 'ruleTemplate' },
+    { type: 'conditional', id: 'flowTemplate' },
+    { type: 'conditional', id: 'coreContent' },
+];
+
+const FALLBACK_TABLE_PROMPT =
+    '你是 Amily2 的表格填写助手，请根据给定的规则模板、流程模板与对话记录，仅输出 <Amily2Edit> 中允许的表格操作，禁止添加其他文本。';
+
+async function getPromptsAndOrder(sectionKey, fallbackOrder) {
+    const toolkit = await getPresetToolkit();
+    if (!toolkit?.available) {
+        console.warn(`[批量填表] 预设提示模块未加载，${sectionKey} 将使用默认回退顺序。`);
+    }
+    const prompts = toolkit?.getPresetPrompts ? await toolkit.getPresetPrompts(sectionKey) : [];
+    let order = toolkit?.getMixedOrder ? toolkit.getMixedOrder(sectionKey) || [] : [];
+    if (!order.length && fallbackOrder) {
+        order = fallbackOrder;
+    }
+    return { prompts: prompts || [], order };
+}
 
 
 async function getWorldBookContext() {
@@ -209,18 +232,7 @@ async function runBatchAttempt(batchNum, attemptNum) {
         const currentTableDataString = convertTablesToCsvString();
         const finalFlowPrompt = flowTemplate.replace('{{{Amily2TableData}}}', currentTableDataString);
 
-        let mixedOrder;
-        try {
-            const savedOrder = localStorage.getItem('amily2_prompt_presets_v2_mixed_order');
-            if (savedOrder) {
-                mixedOrder = JSON.parse(savedOrder);
-            }
-        } catch (e) {
-            console.error("[批量填表] 加载混合顺序失败:", e);
-        }
-        const order = getMixedOrder('batch_filler') || [];
-
-        const presetPrompts = await getPresetPrompts('batch_filler');
+        const { prompts: presetPrompts, order } = await getPromptsAndOrder('batch_filler', DEFAULT_BATCH_MIXED_ORDER);
         
         const worldBookContext = await getWorldBookContext();
         
@@ -255,11 +267,8 @@ async function runBatchAttempt(batchNum, attemptNum) {
             }
         }
 
-        if (!presetPrompts || presetPrompts.length === 0) {
-            const defaultPrompts = [
-                { role: 'system', content: generateRandomSeed() }
-            ];
-            messages.splice(1, 0, ...defaultPrompts);
+        if (!presetPrompts.length) {
+            messages.push({ role: 'system', content: FALLBACK_TABLE_PROMPT });
         }
 
         console.groupCollapsed(`[Amily2 立即远征] 批次 ${batchNum}/${totalBatches} - 即将发送至 API 的内容`);
@@ -400,18 +409,7 @@ export async function startFloorRangeFilling(startFloor, endFloor) {
         const currentTableDataString = convertTablesToCsvString();
         const finalFlowPrompt = flowTemplate.replace('{{{Amily2TableData}}}', currentTableDataString);
 
-        let mixedOrder;
-        try {
-            const savedOrder = localStorage.getItem('amily2_prompt_presets_v2_mixed_order');
-            if (savedOrder) {
-                mixedOrder = JSON.parse(savedOrder);
-            }
-        } catch (e) {
-            console.error("[楼层填表] 加载混合顺序失败:", e);
-        }
-        const order = getMixedOrder('batch_filler') || [];
-
-        const presetPrompts = await getPresetPrompts('batch_filler');
+        const { prompts: presetPrompts, order } = await getPromptsAndOrder('batch_filler', DEFAULT_BATCH_MIXED_ORDER);
         
         const worldBookContext = await getWorldBookContext();
 
@@ -446,11 +444,8 @@ export async function startFloorRangeFilling(startFloor, endFloor) {
             }
         }
 
-        if (!presetPrompts || presetPrompts.length === 0) {
-            const defaultPrompts = [
-                { role: 'system', content: generateRandomSeed() }
-            ];
-            messages.splice(1, 0, ...defaultPrompts);
+        if (!presetPrompts.length) {
+            messages.push({ role: 'system', content: FALLBACK_TABLE_PROMPT });
         }
 
         console.groupCollapsed(`[Amily2 楼层填表] 楼层 ${startFloor}-${endFloor} - 即将发送至 API 的内容`);

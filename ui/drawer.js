@@ -16,10 +16,8 @@ import {
 import { bindModalEvents } from "./bindings.js";
 import { fetchModels } from "../core/api.js";
 import { bindHistoriographyEvents } from "./historiography-bindings.js";
-import { bindHanlinyuanEvents } from "./hanlinyuan-bindings.js";
 import { bindTableEvents } from './table-bindings.js';
 import { showContentModal } from "./page-window.js";
-import { initializeRendererBindings } from "../core/tavern-helper/renderer-bindings.js";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
 
@@ -74,57 +72,22 @@ async function initializePanel(contentPanel, errorContainer) {
         const mainContainer = contentPanel.find('#amily2_chat_optimiser');
 
         if (mainContainer.length) {
-            const additionalFeaturesContent = await $.get(`${extensionFolderPath}/assets/Amily2-AdditionalFeatures.html`);
-            const additionalPanelHtml = `<div id="amily2_additional_features_panel" style="display: none;">${additionalFeaturesContent}</div>`;
-            mainContainer.append(additionalPanelHtml);
-
-            const hanlinyuanContent = await $.get(`${extensionFolderPath}/assets/hanlinyuan.html`);
-            const hanlinyuanPanelHtml = `<div id="amily2_hanlinyuan_panel" style="display: none;">${hanlinyuanContent}</div>`;
-            mainContainer.append(hanlinyuanPanelHtml);
+            // 仅加载“总结”和“记忆表格”所需的核心面板
+            const historiographyContent = await $.get(`${extensionFolderPath}/assets/historiography.html`);
+            const historiographyPanelHtml = `<div id="amily2_historiography_panel" style="display: block;">${historiographyContent}</div>`;
+            mainContainer.append(historiographyPanelHtml);
 
             const memorisationFormsContent = await $.get(`${extensionFolderPath}/assets/Memorisation-forms.html`);
             const memorisationFormsPanelHtml = `<div id="amily2_memorisation_forms_panel" style="display: none;">${memorisationFormsContent}</div>`;
             mainContainer.append(memorisationFormsPanelHtml);
-
-            const plotOptimizationContent = await $.get(`${extensionFolderPath}/assets/Amily2-optimization.html`);
-            const plotOptimizationPanelHtml = `<div id="amily2_plot_optimization_panel" style="display: none;">${plotOptimizationContent}</div>`;
-            mainContainer.append(plotOptimizationPanelHtml);
-
-            const cwbContent = await $.get(`${extensionFolderPath}/CharacterWorldBook/cwb_settings.html`);
-            const cwbPanelHtml = `<div id="amily2_character_world_book_panel" style="display: none;">${cwbContent}</div>`;
-            mainContainer.append(cwbPanelHtml);
-
-            const worldEditorContent = await $.get(`${extensionFolderPath}/WorldEditor.html`);
-            const worldEditorPanelHtml = `<div id="amily2_world_editor_panel" style="display: none;">${worldEditorContent}</div>`;
-            mainContainer.append(worldEditorPanelHtml);
-
-            const glossaryContent = await $.get(`${extensionFolderPath}/assets/amily2-glossary.html`);
-            const glossaryPanelHtml = `<div id="amily2_glossary_panel" style="display: none;">${glossaryContent}</div>`;
-            mainContainer.append(glossaryPanelHtml);
-
-            const rendererContent = await $.get(`${extensionFolderPath}/core/tavern-helper/renderer.html`);
-            const rendererPanelHtml = `<div id="amily2_renderer_panel" style="display: none;">${rendererContent}</div>`;
-            mainContainer.append(rendererPanelHtml);
-
-            // 在面板创建后，加载世界书编辑器脚本
-            const worldEditorScriptId = 'world-editor-script';
-            if (!document.getElementById(worldEditorScriptId)) {
-                const worldEditorScript = document.createElement("script");
-                worldEditorScript.id = worldEditorScriptId;
-                worldEditorScript.type = "module"; // 必须作为模块加载
-                worldEditorScript.src = `${extensionFolderPath}/WorldEditor/WorldEditor.js?v=${Date.now()}`;
-                document.head.appendChild(worldEditorScript);
-            }
         }
 
         bindModalEvents();
         bindHistoriographyEvents();
         await loadSettings();
-        bindHanlinyuanEvents();
         bindTableEvents();
-        initializeRendererBindings();
         contentPanel.data("initialized", true);
-        console.log("[Amily-重构] 宫殿模块已按蓝图竣工。");
+        console.log("[Amily2-Slim] Drawer初始化完成：仅总结+表格面板。");
         applyUpdateIndicator();
     } catch (error) {
         console.error("[Amily-建设部] 紧急报告：加载模块化蓝图时发生意外:", error);

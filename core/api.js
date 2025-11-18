@@ -813,7 +813,3 @@ export function generateRandomSeed() {
 }
 
 
-export async function checkAndFixWithAPI(latestMessage, previousMessages) {
-    const { processOptimization } = await import('./summarizer.js');
-    return await processOptimization(latestMessage, previousMessages);
-}

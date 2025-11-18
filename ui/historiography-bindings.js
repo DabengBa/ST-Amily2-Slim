@@ -131,8 +131,6 @@ export function bindHistoriographyEvents() {
     const smallAutoEnable = document.getElementById("amily2_mhb_small_auto_enabled");
     const smallTriggerThreshold = document.getElementById("amily2_mhb_small_trigger_count");
     const writeToLorebook = document.getElementById("historiography_write_to_lorebook");
-    const ingestToRag = document.getElementById("historiography_ingest_to_rag");
-
     smallExecuteBtn.addEventListener("click", () => {
         const start = parseInt(smallStartFloor.value, 10);
         const end = parseInt(smallEndFloor.value, 10);
@@ -178,17 +176,10 @@ export function bindHistoriographyEvents() {
         saveSettings();
     });
 
-    ingestToRag.addEventListener("change", (event) => {
-        extension_settings[extensionName].historiographyIngestToRag = event.target.checked;
-        saveSettings();
-    });
-
-
     smallAutoEnable.checked = extension_settings[extensionName].historiographySmallAutoEnable ?? false;
     smallTriggerThreshold.value = extension_settings[extensionName].historiographySmallTriggerThreshold ?? 30;
     retentionCount.value = extension_settings[extensionName].historiographyRetentionCount ?? 5;
     writeToLorebook.checked = extension_settings[extensionName].historiographyWriteToLorebook ?? true;
-    ingestToRag.checked = extension_settings[extensionName].historiographyIngestToRag ?? false;
 
     const autoSummaryInteractive = document.getElementById("historiography_auto_summary_interactive");
     autoSummaryInteractive.checked = extension_settings[extensionName].historiographyAutoSummaryInteractive ?? false;
@@ -337,12 +328,6 @@ export function bindHistoriographyEvents() {
   });
 
 
-  const vectorizeSummaryContent = document.getElementById("amily2_vectorize_summary_content");
-  vectorizeSummaryContent.checked = extension_settings[extensionName].historiographyVectorizeSummary ?? false;
-  vectorizeSummaryContent.addEventListener("change", (event) => {
-      extension_settings[extensionName].historiographyVectorizeSummary = event.target.checked;
-      saveSettings();
-  });
 }
 
 
