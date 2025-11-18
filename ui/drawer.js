@@ -1,4 +1,4 @@
-import { getSlideToggleOptions } from '/script.js';
+import { getSlideToggleOptions, saveSettingsDebounced } from '/script.js';
 import { slideToggle } from '/lib.js';
 import { extension_settings, renderExtensionTemplateAsync } from "/scripts/extensions.js";
 import { extensionName, defaultSettings } from "../utils/settings.js";
@@ -148,12 +148,22 @@ function toggleDrawerFallback() {
 }
 
 
-export async function createDrawer() {
+export async function createDrawer(preferredLocation) {
   const settings = extension_settings[extensionName];
-  const location = settings.iconLocation || 'topbar'; 
+  const location = preferredLocation || settings.iconLocation || 'topbar'; 
 
   if (location === 'topbar') {
     if ($("#amily2_main_drawer").length > 0) return; 
+
+    const sysSettingsButton = $("#sys-settings-button");
+    if (sysSettingsButton.length === 0) {
+        console.warn('[Amily2-Slim] 未检测到系统设置按钮，自动切换到扩展面板入口。');
+        if (settings.iconLocation !== 'extensions') {
+            settings.iconLocation = 'extensions';
+            saveSettingsDebounced();
+        }
+        return createDrawer('extensions');
+    }
 
     const amily2DrawerHtml = `
       <div id="amily2_main_drawer" class="drawer">
@@ -164,7 +174,7 @@ export async function createDrawer() {
           </div>
       </div>
     `;
-    $("#sys-settings-button").after(amily2DrawerHtml);
+    sysSettingsButton.after(amily2DrawerHtml);
 
     const contentPanel = $("#amily2_drawer_content");
     await initializePanel(contentPanel);
@@ -183,7 +193,15 @@ export async function createDrawer() {
     }
 
   } else if (location === 'extensions') {
-    if ($("#extensions_settings2 #amily2_chat_optimiser").length > 0) return; 
+    if ($("#extensions_settings2 #amily2_extension_frame").length > 0 || $("#extensions_settings2 #amily2_chat_optimiser").length > 0) return; 
+
+    const extensionsPanel = $('#extensions_settings2');
+    if (extensionsPanel.length === 0) {
+        console.warn('[Amily2-Slim] 扩展设置面板尚未渲染，500ms 后重试入口注入。');
+        setTimeout(() => createDrawer('extensions'), 500);
+        return;
+    }
+
     const amilyFrameHtml = `
       <div id="amily2_extension_frame">
           <div class="inline-drawer">
@@ -198,7 +216,7 @@ export async function createDrawer() {
     `;
 
     const frame = $(amilyFrameHtml);
-    $('#extensions_settings2').append(frame);
+    extensionsPanel.append(frame);
     const contentPanel = frame.find('.inline-drawer-content');
     initializePanel(contentPanel, frame);
   }
